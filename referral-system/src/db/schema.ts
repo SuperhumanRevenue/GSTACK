@@ -1,0 +1,415 @@
+import {
+  pgTable,
+  uuid,
+  text,
+  integer,
+  decimal,
+  boolean,
+  timestamp,
+  pgEnum,
+  jsonb,
+  index,
+} from 'drizzle-orm/pg-core';
+
+// ─── Enums ───
+
+export const readinessTierEnum = pgEnum('readiness_tier', [
+  'hot',
+  'warm',
+  'not_yet',
+]);
+
+export const askTypeEnum = pgEnum('ask_type', ['live', 'async', 'soft_seed']);
+
+export const responseEnum = pgEnum('response_type', [
+  'yes',
+  'maybe',
+  'no',
+  'no_response',
+  'pending',
+]);
+
+export const referralStatusEnum = pgEnum('referral_status', [
+  'ask_pending',
+  'ask_sent',
+  'intro_pending',
+  'intro_sent',
+  'meeting_booked',
+  'opportunity_created',
+  'closed_won',
+  'closed_lost',
+  'deferred',
+  'expired',
+  'declined',
+]);
+
+export const superReferrerTierEnum = pgEnum('super_referrer_tier', [
+  'platinum',
+  'gold',
+  'silver',
+  'bronze',
+]);
+
+export const rewardCategoryEnum = pgEnum('reward_category', [
+  'recognition',
+  'reciprocal',
+  'economic',
+  'access',
+  'co_marketing',
+]);
+
+// ─── Core Tables ───
+
+export const accounts = pgTable(
+  'accounts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    crmAccountId: text('crm_account_id').unique(),
+    companyName: text('company_name').notNull(),
+    industry: text('industry'),
+    employeeCount: integer('employee_count'),
+    currentAcv: decimal('current_acv', { precision: 12, scale: 2 }),
+    contractStartDate: timestamp('contract_start_date'),
+    renewalDate: timestamp('renewal_date'),
+    tenureMonths: integer('tenure_months'),
+    csHealthScore: integer('cs_health_score'), // 0-100
+    npsScore: integer('nps_score'), // 0-10
+    lastQbrDate: timestamp('last_qbr_date'),
+    lastQbrOutcome: text('last_qbr_outcome'), // positive/neutral/negative
+    supportEscalationActive: boolean('support_escalation_active').default(false),
+    churnRiskActive: boolean('churn_risk_active').default(false),
+    usageTrend: text('usage_trend'), // growing/stable/declining
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_accounts_industry').on(table.industry),
+    index('idx_accounts_acv').on(table.currentAcv),
+  ]
+);
+
+export const champions = pgTable(
+  'champions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .references(() => accounts.id)
+      .notNull(),
+    name: text('name').notNull(),
+    title: text('title').notNull(),
+    email: text('email'),
+    linkedinUrl: text('linkedin_url'),
+    seniorityLevel: text('seniority_level'), // c_suite/vp/director/manager
+    relationshipStrength: text('relationship_strength'), // strong/warm/cold
+    isExecutiveSponsor: boolean('is_executive_sponsor').default(false),
+    formerCompanies: jsonb('former_companies').$type<string[]>(),
+    industryCommunities: jsonb('industry_communities').$type<string[]>(),
+    communicationStyle: text('communication_style'), // formal/casual
+    networkReachScore: integer('network_reach_score'), // 0-100 (from enrichment)
+    lastInteractionDate: timestamp('last_interaction_date'),
+    departedAt: timestamp('departed_at'), // null = still active
+    metadata: jsonb('metadata'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [index('idx_champions_account').on(table.accountId)]
+);
+
+export const readinessScores = pgTable(
+  'readiness_scores',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .references(() => accounts.id)
+      .notNull(),
+    championId: uuid('champion_id')
+      .references(() => champions.id)
+      .notNull(),
+    totalScore: integer('total_score').notNull(), // 0-100
+    tier: readinessTierEnum('tier').notNull(),
+    valueDeliveredScore: integer('value_delivered_score').notNull(), // 0-25
+    relationshipStrengthScore: integer('relationship_strength_score').notNull(), // 0-20
+    recencyOfWinScore: integer('recency_of_win_score').notNull(), // 0-20
+    networkValueScore: integer('network_value_score').notNull(), // 0-20
+    askHistoryScore: integer('ask_history_score').notNull(), // 0-15
+    triggerEvent: text('trigger_event'),
+    triggerDate: timestamp('trigger_date'),
+    antiTriggers: jsonb('anti_triggers').$type<string[]>(),
+    scoringRationale: text('scoring_rationale'),
+    scoredAt: timestamp('scored_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_readiness_account').on(table.accountId),
+    index('idx_readiness_tier').on(table.tier),
+    index('idx_readiness_score').on(table.totalScore),
+  ]
+);
+
+export const connectionMaps = pgTable(
+  'connection_maps',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    championId: uuid('champion_id')
+      .references(() => champions.id)
+      .notNull(),
+    targetCompany: text('target_company').notNull(),
+    targetContact: text('target_contact').notNull(),
+    targetTitle: text('target_title').notNull(),
+    targetLinkedinUrl: text('target_linkedin_url'),
+    connectionPath: text('connection_path').notNull(),
+    connectionStrengthScore: integer('connection_strength_score'), // 1-10
+    targetAccountPriority: integer('target_account_priority'), // 1-10
+    roleMatchScore: integer('role_match_score'), // 1-10
+    painAlignmentScore: integer('pain_alignment_score'), // 1-10
+    timingSignalScore: integer('timing_signal_score'), // 1-10
+    compositeScore: integer('composite_score'), // 1-10 weighted
+    suggestedFraming: text('suggested_framing'),
+    existingRelationship: text('existing_relationship'),
+    mappedAt: timestamp('mapped_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_connections_champion').on(table.championId),
+    index('idx_connections_score').on(table.compositeScore),
+  ]
+);
+
+export const referrals = pgTable(
+  'referrals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .references(() => accounts.id)
+      .notNull(),
+    championId: uuid('champion_id')
+      .references(() => champions.id)
+      .notNull(),
+    connectionMapId: uuid('connection_map_id').references(
+      () => connectionMaps.id
+    ),
+    readinessScoreId: uuid('readiness_score_id').references(
+      () => readinessScores.id
+    ),
+
+    // Target info
+    targetCompany: text('target_company').notNull(),
+    targetContact: text('target_contact').notNull(),
+    targetTitle: text('target_title').notNull(),
+
+    // Ask details
+    askType: askTypeEnum('ask_type').notNull(),
+    askDate: timestamp('ask_date'),
+    askContent: text('ask_content'),
+    triggerEvent: text('trigger_event').notNull(),
+    readinessScoreAtAsk: integer('readiness_score_at_ask'),
+
+    // Response tracking
+    response: responseEnum('response').default('pending'),
+    responseDate: timestamp('response_date'),
+    followUpCount: integer('follow_up_count').default(0),
+    lastFollowUpDate: timestamp('last_follow_up_date'),
+
+    // Pipeline progression
+    status: referralStatusEnum('status').default('ask_pending'),
+    introDate: timestamp('intro_date'),
+    introContent: text('intro_content'),
+    meetingDate: timestamp('meeting_date'),
+    crmOpportunityId: text('crm_opportunity_id'),
+    opportunityAmount: decimal('opportunity_amount', {
+      precision: 12,
+      scale: 2,
+    }),
+    closedDate: timestamp('closed_date'),
+    closedAmount: decimal('closed_amount', { precision: 12, scale: 2 }),
+    timeToCloseDays: integer('time_to_close_days'),
+
+    // Reward tracking
+    championReward: text('champion_reward'),
+    rewardDate: timestamp('reward_date'),
+
+    // Ownership
+    owningAe: text('owning_ae'),
+    notes: text('notes'),
+
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_referrals_account').on(table.accountId),
+    index('idx_referrals_champion').on(table.championId),
+    index('idx_referrals_status').on(table.status),
+    index('idx_referrals_ask_date').on(table.askDate),
+  ]
+);
+
+export const superReferrers = pgTable(
+  'super_referrers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    championId: uuid('champion_id')
+      .references(() => champions.id)
+      .notNull()
+      .unique(),
+    superScore: integer('super_score').notNull(), // 0-100
+    tier: superReferrerTierEnum('tier').notNull(),
+    volumeScore: integer('volume_score').notNull(), // 0-20
+    qualityScore: integer('quality_score').notNull(), // 0-25
+    valueScore: integer('value_score').notNull(), // 0-20
+    networkScore: integer('network_score').notNull(), // 0-20
+    velocityScore: integer('velocity_score').notNull(), // 0-15
+    totalReferrals: integer('total_referrals').default(0),
+    totalIntros: integer('total_intros').default(0),
+    totalMeetings: integer('total_meetings').default(0),
+    totalClosed: integer('total_closed').default(0),
+    totalRevenue: decimal('total_revenue', { precision: 12, scale: 2 }).default(
+      '0'
+    ),
+    avgDealSize: decimal('avg_deal_size', { precision: 12, scale: 2 }),
+    avgTimeToClose: integer('avg_time_to_close'),
+    responseRate: decimal('response_rate', { precision: 5, scale: 4 }),
+    lastReferralDate: timestamp('last_referral_date'),
+    programJoinDate: timestamp('program_join_date'),
+    rewardsDelivered: jsonb('rewards_delivered').$type<
+      { type: string; date: string; description: string }[]
+    >(),
+    recalculatedAt: timestamp('recalculated_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_super_referrers_score').on(table.superScore),
+    index('idx_super_referrers_tier').on(table.tier),
+  ]
+);
+
+export const referralTargets = pgTable('referral_targets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  referralId: uuid('referral_id').references(() => referrals.id),
+  targetCompany: text('target_company').notNull(),
+  targetContact: text('target_contact').notNull(),
+  targetTitle: text('target_title').notNull(),
+  referredByChampionId: uuid('referred_by_champion_id').references(
+    () => champions.id
+  ),
+  icpFitScore: integer('icp_fit_score'), // 0-30
+  painAlignmentScore: integer('pain_alignment_score'), // 0-25
+  championCredibilityScore: integer('champion_credibility_score'), // 0-20
+  timingScore: integer('timing_score'), // 0-15
+  dealSizeScore: integer('deal_size_score'), // 0-10
+  totalTargetScore: integer('total_target_score'), // 0-100
+  priority: text('priority'), // high/medium/low
+  scoredAt: timestamp('scored_at').defaultNow(),
+});
+
+export const triggerEvents = pgTable(
+  'trigger_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .references(() => accounts.id)
+      .notNull(),
+    championId: uuid('champion_id').references(() => champions.id),
+    eventType: text('event_type').notNull(),
+    eventCategory: text('event_category').notNull(), // usage/relationship/business/calendar/risk_flip
+    eventDescription: text('event_description').notNull(),
+    eventDate: timestamp('event_date').notNull(),
+    dataSource: text('data_source'), // crm/gong/nps_platform/manual
+    isAntiTrigger: boolean('is_anti_trigger').default(false),
+    processedForScoring: boolean('processed_for_scoring').default(false),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_trigger_events_account').on(table.accountId),
+    index('idx_trigger_events_date').on(table.eventDate),
+    index('idx_trigger_events_type').on(table.eventType),
+  ]
+);
+
+export const incentivePackages = pgTable(
+  'incentive_packages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    // Company context
+    companyName: text('company_name').notNull(),
+    companyStage: text('company_stage'), // startup/growth/enterprise
+    companyArr: decimal('company_arr', { precision: 14, scale: 2 }),
+    companyIndustry: text('company_industry'),
+    avgAcv: decimal('avg_acv', { precision: 12, scale: 2 }),
+    acvRangeLow: decimal('acv_range_low', { precision: 12, scale: 2 }),
+    acvRangeHigh: decimal('acv_range_high', { precision: 12, scale: 2 }),
+    currentOutboundCac: decimal('current_outbound_cac', {
+      precision: 12,
+      scale: 2,
+    }),
+    customerCount: integer('customer_count'),
+    // Referrer context (null for program-wide defaults)
+    championId: uuid('champion_id').references(() => champions.id),
+    referrerSeniority: text('referrer_seniority'),
+    referrerMotivation: text('referrer_motivation'),
+    superReferrerTier: superReferrerTierEnum('super_referrer_tier'),
+    // Economics
+    rewardCeiling: decimal('reward_ceiling', { precision: 12, scale: 2 }),
+    annualProgramBudget: decimal('annual_program_budget', {
+      precision: 12,
+      scale: 2,
+    }),
+    // Package
+    primaryRewardCategory: rewardCategoryEnum('primary_reward_category'),
+    primaryRewardDescription: text('primary_reward_description'),
+    primaryRewardCost: decimal('primary_reward_cost', {
+      precision: 12,
+      scale: 2,
+    }),
+    primaryRewardTiming: text('primary_reward_timing'),
+    secondaryRewardCategory: rewardCategoryEnum('secondary_reward_category'),
+    secondaryRewardDescription: text('secondary_reward_description'),
+    secondaryRewardCost: decimal('secondary_reward_cost', {
+      precision: 12,
+      scale: 2,
+    }),
+    secondaryRewardTiming: text('secondary_reward_timing'),
+    ongoingBenefits: jsonb('ongoing_benefits').$type<string[]>(),
+    totalCostPerReferral: decimal('total_cost_per_referral', {
+      precision: 12,
+      scale: 2,
+    }),
+    cacSavingsPct: decimal('cac_savings_pct', { precision: 5, scale: 2 }),
+    // Escalation
+    escalationPath: jsonb('escalation_path').$type<
+      { referral_number: number; reward_change: string }[]
+    >(),
+    // Language guidance
+    languageToUse: text('language_to_use'),
+    languageToAvoid: text('language_to_avoid'),
+    // Edge case handling
+    edgeCaseNotes: text('edge_case_notes'),
+    // Performance tracking
+    timesUsed: integer('times_used').default(0),
+    conversionRate: decimal('conversion_rate', { precision: 5, scale: 4 }),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_incentive_champion').on(table.championId),
+    index('idx_incentive_company').on(table.companyName),
+  ]
+);
+
+// ─── Type Exports ───
+
+export type Account = typeof accounts.$inferSelect;
+export type NewAccount = typeof accounts.$inferInsert;
+export type Champion = typeof champions.$inferSelect;
+export type NewChampion = typeof champions.$inferInsert;
+export type ReadinessScore = typeof readinessScores.$inferSelect;
+export type NewReadinessScore = typeof readinessScores.$inferInsert;
+export type ConnectionMap = typeof connectionMaps.$inferSelect;
+export type NewConnectionMap = typeof connectionMaps.$inferInsert;
+export type Referral = typeof referrals.$inferSelect;
+export type NewReferral = typeof referrals.$inferInsert;
+export type SuperReferrer = typeof superReferrers.$inferSelect;
+export type NewSuperReferrer = typeof superReferrers.$inferInsert;
+export type ReferralTarget = typeof referralTargets.$inferSelect;
+export type NewReferralTarget = typeof referralTargets.$inferInsert;
+export type TriggerEvent = typeof triggerEvents.$inferSelect;
+export type NewTriggerEvent = typeof triggerEvents.$inferInsert;
+export type IncentivePackage = typeof incentivePackages.$inferSelect;
+export type NewIncentivePackage = typeof incentivePackages.$inferInsert;
