@@ -5,8 +5,9 @@ import { registerMapperTools } from '../agents/relationship-mapper/index.js';
 import { registerAskTools } from '../agents/ask-architect/index.js';
 import { registerProgramManagerTools } from '../agents/program-manager/index.js';
 import { registerIncentiveTools } from '../agents/incentive-designer/index.js';
+import { registerSignalGuideTools } from '../agents/signal-guide/index.js';
 
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 
 export function createMcpServer(deps: ServerDeps): McpServer {
   const server = new McpServer({
@@ -28,6 +29,9 @@ export function createMcpServer(deps: ServerDeps): McpServer {
 
   // Phase 4: Incentive Designer (4 tools)
   registerIncentiveTools(server, deps);
+
+  // Signal Guide Engine (4 tools)
+  registerSignalGuideTools(server, deps);
 
   return server;
 }

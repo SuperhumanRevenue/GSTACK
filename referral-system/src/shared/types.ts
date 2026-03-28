@@ -5,6 +5,8 @@ import type { EnrichmentAdapter } from '../integrations/enrichment/interface.js'
 import type { ConversationIntelAdapter } from '../integrations/conversation-intel/interface.js';
 import type { NotificationAdapter } from '../integrations/notifications/interface.js';
 import type { IntentAdapter } from '../integrations/intent/interface.js';
+import type { LLMAdapter } from '../integrations/llm/interface.js';
+import type { WebSearchAdapter } from '../integrations/web-search/interface.js';
 import type { CacheClient } from '../cache/redis.js';
 
 /** Dependency injection container passed to all agents */
@@ -16,6 +18,8 @@ export interface ServerDeps {
   conversationIntel: ConversationIntelAdapter;
   notifications: NotificationAdapter;
   intent: IntentAdapter;
+  llm: LLMAdapter;
+  webSearch: WebSearchAdapter;
   config: AppConfig;
 }
 

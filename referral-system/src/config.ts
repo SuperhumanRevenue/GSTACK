@@ -41,6 +41,8 @@ const configSchema = z.object({
   enableIntentData: z.coerce.boolean().default(false),
   enableSlackNotifications: z.coerce.boolean().default(false),
   enableAutoTriggerScan: z.coerce.boolean().default(false),
+  enableLLM: z.coerce.boolean().default(false),
+  enableWebSearch: z.coerce.boolean().default(false),
 
   // Scoring Configuration
   readinessHotThreshold: z.coerce.number().default(80),
@@ -80,6 +82,8 @@ export function loadConfig(): AppConfig {
     enableIntentData: process.env.ENABLE_INTENT_DATA,
     enableSlackNotifications: process.env.ENABLE_SLACK_NOTIFICATIONS,
     enableAutoTriggerScan: process.env.ENABLE_AUTO_TRIGGER_SCAN,
+    enableLLM: process.env.ENABLE_LLM,
+    enableWebSearch: process.env.ENABLE_WEB_SEARCH,
     readinessHotThreshold: process.env.READINESS_HOT_THRESHOLD,
     readinessWarmThreshold: process.env.READINESS_WARM_THRESHOLD,
     superReferrerPlatinumThreshold: process.env.SUPER_REFERRER_PLATINUM_THRESHOLD,

@@ -393,6 +393,131 @@ export const incentivePackages = pgTable(
   ]
 );
 
+// ─── Signal Guide Enums ───
+
+export const signalStrengthEnum = pgEnum('signal_strength', [
+  'low',
+  'medium',
+  'high',
+]);
+
+export const signalTagEnum = pgEnum('signal_tag', [
+  'sales_led',
+  'product_led',
+  'nearbound',
+  'event',
+  'competitor',
+  'community_led',
+]);
+
+export const signalChannelEnum = pgEnum('signal_channel', [
+  'dark_funnel',
+  'crm',
+  'website',
+  'product',
+  'community',
+  'open_source',
+]);
+
+export const funnelStageEnum = pgEnum('funnel_stage', [
+  'top_awareness',
+  'mid_consideration',
+  'bottom_conversion',
+]);
+
+export const customerContextStatusEnum = pgEnum('customer_context_status', [
+  'intake',
+  'researching',
+  'generating',
+  'complete',
+]);
+
+// ─── Signal Guide Tables ───
+
+/** Master 100-signal library — seed data that ships with the system */
+export const signalTemplates = pgTable(
+  'signal_templates',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    signalName: text('signal_name').notNull(),
+    whyItMatters: text('why_it_matters').notNull(),
+    strength: signalStrengthEnum('strength').notNull(),
+    tag: signalTagEnum('tag').notNull(),
+    channel: signalChannelEnum('channel').notNull(),
+    funnelStage: funnelStageEnum('funnel_stage').notNull(),
+    hasPlaybook: boolean('has_playbook').default(false),
+    playbook: text('playbook'),
+    categoryOrder: integer('category_order').default(0),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_signal_templates_tag').on(table.tag),
+    index('idx_signal_templates_strength').on(table.strength),
+  ]
+);
+
+/** Customer intake data for custom signal guide generation */
+export const customerContexts = pgTable(
+  'customer_contexts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    companyName: text('company_name').notNull(),
+    positioning: text('positioning'),
+    messaging: text('messaging'),
+    caseStudies: jsonb('case_studies').$type<{ title: string; summary: string; metrics?: string[] }[]>(),
+    masterDeckSummary: text('master_deck_summary'),
+    packaging: jsonb('packaging').$type<{ tier: string; description: string; price?: string }[]>(),
+    productDescription: text('product_description'),
+    targetIndustries: jsonb('target_industries').$type<string[]>(),
+    targetPersonas: jsonb('target_personas').$type<{ title: string; painPoints: string[]; goals: string[] }[]>(),
+    competitors: jsonb('competitors').$type<{ name: string; positioning?: string; weaknesses?: string[] }[]>(),
+    techStackAdjacencies: jsonb('tech_stack_adjacencies').$type<string[]>(),
+    marketResearch: jsonb('market_research').$type<{
+      industryTrends: string[];
+      competitorInsights: { competitor: string; findings: string[] }[];
+      marketDynamics: string[];
+      techLandscape: string[];
+    }>(),
+    status: customerContextStatusEnum('status').default('intake'),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_customer_contexts_company').on(table.companyName),
+    index('idx_customer_contexts_status').on(table.status),
+  ]
+);
+
+/** Generated per-customer signal guide entries */
+export const customSignalGuides = pgTable(
+  'custom_signal_guides',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    customerContextId: uuid('customer_context_id')
+      .references(() => customerContexts.id)
+      .notNull(),
+    signalTemplateId: uuid('signal_template_id')
+      .references(() => signalTemplates.id)
+      .notNull(),
+    customizedName: text('customized_name').notNull(),
+    customizedDescription: text('customized_description').notNull(),
+    customizedPlaybook: text('customized_playbook'),
+    strength: signalStrengthEnum('strength').notNull(),
+    tag: signalTagEnum('tag').notNull(),
+    channel: signalChannelEnum('channel').notNull(),
+    funnelStage: funnelStageEnum('funnel_stage').notNull(),
+    relevanceScore: integer('relevance_score').notNull(), // 0-100
+    exampleTriggers: jsonb('example_triggers').$type<string[]>(),
+    active: boolean('active').default(true),
+    generatedAt: timestamp('generated_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_custom_signals_context').on(table.customerContextId),
+    index('idx_custom_signals_relevance').on(table.relevanceScore),
+    index('idx_custom_signals_active').on(table.active),
+  ]
+);
+
 // ─── Type Exports ───
 
 export type Account = typeof accounts.$inferSelect;
@@ -413,3 +538,9 @@ export type TriggerEvent = typeof triggerEvents.$inferSelect;
 export type NewTriggerEvent = typeof triggerEvents.$inferInsert;
 export type IncentivePackage = typeof incentivePackages.$inferSelect;
 export type NewIncentivePackage = typeof incentivePackages.$inferInsert;
+export type SignalTemplate = typeof signalTemplates.$inferSelect;
+export type NewSignalTemplate = typeof signalTemplates.$inferInsert;
+export type CustomerContext = typeof customerContexts.$inferSelect;
+export type NewCustomerContext = typeof customerContexts.$inferInsert;
+export type CustomSignalGuide = typeof customSignalGuides.$inferSelect;
+export type NewCustomSignalGuide = typeof customSignalGuides.$inferInsert;

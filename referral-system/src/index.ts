@@ -16,6 +16,8 @@ import { ConversationIntelStub } from './integrations/conversation-intel/stub.js
 import { NotificationStub } from './integrations/notifications/stub.js';
 import { SlackAdapter } from './integrations/notifications/slack.js';
 import { IntentStub } from './integrations/intent/stub.js';
+import { LLMStub } from './integrations/llm/stub.js';
+import { WebSearchStub } from './integrations/web-search/stub.js';
 import { RateLimiter, DEFAULT_RATE_LIMITS } from './integrations/rate-limiter.js';
 import type { ServerDeps } from './shared/types.js';
 import type { CRMAdapter } from './integrations/crm/interface.js';
@@ -77,6 +79,14 @@ async function main() {
   // Intent: always stub for now
   const intent = new IntentStub();
 
+  // LLM: stub for now (swap for Claude/GPT/Gemini adapter)
+  const llm = new LLMStub();
+  logger.info('LLM: Stub');
+
+  // Web Search: stub for now (swap for Tavily adapter)
+  const webSearch = new WebSearchStub();
+  logger.info('Web Search: Stub');
+
   // 6. Assemble dependency container
   const deps: ServerDeps = {
     db,
@@ -86,10 +96,12 @@ async function main() {
     conversationIntel,
     notifications,
     intent,
+    llm,
+    webSearch,
     config,
   };
 
-  // 7. Create MCP server with all 22 tools
+  // 7. Create MCP server with all 26 tools
   const server = createMcpServer(deps);
 
   // 8. Start transport
