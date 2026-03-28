@@ -4,8 +4,9 @@ import { registerReadinessTools } from '../agents/readiness-scorer/index.js';
 import { registerMapperTools } from '../agents/relationship-mapper/index.js';
 import { registerAskTools } from '../agents/ask-architect/index.js';
 import { registerProgramManagerTools } from '../agents/program-manager/index.js';
+import { registerIncentiveTools } from '../agents/incentive-designer/index.js';
 
-const VERSION = '0.3.0';
+const VERSION = '0.4.0';
 
 export function createMcpServer(deps: ServerDeps): McpServer {
   const server = new McpServer({
@@ -22,11 +23,11 @@ export function createMcpServer(deps: ServerDeps): McpServer {
   // Phase 3: Ask Architect (3 tools)
   registerAskTools(server, deps);
 
-  // Phase 3: Program Manager CRUD (2 tools)
+  // Phase 3+4: Program Manager (8 tools — 2 CRUD + 6 analytics)
   registerProgramManagerTools(server, deps);
 
-  // Phase 4: Program Manager Analytics (6 tools) — TODO
-  // Phase 4: Incentive Designer (4 tools) — TODO
+  // Phase 4: Incentive Designer (4 tools)
+  registerIncentiveTools(server, deps);
 
   return server;
 }
