@@ -4,19 +4,30 @@ import { loadConfig } from './config.js';
 import { createDbClient } from './db/client.js';
 import { CacheClient } from './cache/redis.js';
 import { createMcpServer } from './server/mcp-server.js';
+import { startHttpTransport } from './server/http-transport.js';
+
+// Integration adapters
 import { HubSpotStub } from './integrations/crm/hubspot-stub.js';
+import { HubSpotAdapter } from './integrations/crm/hubspot.js';
 import { EnrichmentStub } from './integrations/enrichment/stub.js';
+import { ApolloAdapter } from './integrations/enrichment/apollo.js';
+import { CachedEnrichmentAdapter } from './integrations/enrichment/cached.js';
 import { ConversationIntelStub } from './integrations/conversation-intel/stub.js';
 import { NotificationStub } from './integrations/notifications/stub.js';
+import { SlackAdapter } from './integrations/notifications/slack.js';
 import { IntentStub } from './integrations/intent/stub.js';
+import { RateLimiter, DEFAULT_RATE_LIMITS } from './integrations/rate-limiter.js';
 import type { ServerDeps } from './shared/types.js';
+import type { CRMAdapter } from './integrations/crm/interface.js';
+import type { EnrichmentAdapter } from './integrations/enrichment/interface.js';
+import type { NotificationAdapter } from './integrations/notifications/interface.js';
 
 const logger = pino({ name: 'referral-system' });
 
 async function main() {
   // 1. Load config
   const config = loadConfig();
-  logger.info({ transport: config.mcpTransport, env: config.nodeEnv }, 'Starting referral system');
+  logger.info({ transport: config.mcpTransport, env: config.nodeEnv }, 'Starting referral system v0.5.0');
 
   // 2. Connect to database
   const db = createDbClient(config.databaseUrl);
@@ -25,14 +36,48 @@ async function main() {
   // 3. Initialize cache (optional — degrades gracefully)
   const cache = new CacheClient(config.redisUrl);
 
-  // 4. Initialize integration adapters (stubs for now)
-  const crm = new HubSpotStub();
-  const enrichment = new EnrichmentStub();
+  // 4. Initialize rate limiter
+  const rateLimiter = new RateLimiter(DEFAULT_RATE_LIMITS);
+
+  // 5. Initialize integration adapters
+  // CRM: HubSpot live or stub
+  let crm: CRMAdapter;
+  if (config.hubspotAccessToken) {
+    crm = new HubSpotAdapter(config.hubspotAccessToken);
+    logger.info('CRM: HubSpot (live)');
+  } else {
+    crm = new HubSpotStub();
+    logger.info('CRM: HubSpot (stub)');
+  }
+
+  // Enrichment: Apollo live (with cache) or stub
+  let enrichment: EnrichmentAdapter;
+  if (config.enableEnrichment && config.apolloApiKey) {
+    const apolloAdapter = new ApolloAdapter(config.apolloApiKey);
+    enrichment = new CachedEnrichmentAdapter(apolloAdapter, cache);
+    logger.info('Enrichment: Apollo (live + cached)');
+  } else {
+    enrichment = new EnrichmentStub();
+    logger.info('Enrichment: Stub');
+  }
+
+  // Conversation intel: always stub for now
   const conversationIntel = new ConversationIntelStub();
-  const notifications = new NotificationStub();
+
+  // Notifications: Slack live or stub
+  let notifications: NotificationAdapter;
+  if (config.enableSlackNotifications && config.slackBotToken && config.slackReferralChannel) {
+    notifications = new SlackAdapter(config.slackBotToken, config.slackReferralChannel);
+    logger.info('Notifications: Slack (live)');
+  } else {
+    notifications = new NotificationStub();
+    logger.info('Notifications: Stub');
+  }
+
+  // Intent: always stub for now
   const intent = new IntentStub();
 
-  // 5. Assemble dependency container
+  // 6. Assemble dependency container
   const deps: ServerDeps = {
     db,
     cache,
@@ -44,18 +89,17 @@ async function main() {
     config,
   };
 
-  // 6. Create MCP server with all tools
+  // 7. Create MCP server with all 22 tools
   const server = createMcpServer(deps);
 
-  // 7. Start transport
+  // 8. Start transport
   if (config.mcpTransport === 'stdio') {
     const transport = new StdioServerTransport();
     await server.connect(transport);
     logger.info('MCP server running on stdio transport');
   } else {
-    // Streamable HTTP transport — Phase 5
-    logger.error('HTTP transport not yet implemented. Use MCP_TRANSPORT=stdio');
-    process.exit(1);
+    await startHttpTransport(server, config.port);
+    logger.info({ port: config.port }, 'MCP server running on streamable HTTP transport');
   }
 }
 
