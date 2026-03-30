@@ -9,8 +9,9 @@ import { registerSignalGuideTools } from '../agents/signal-guide/index.js';
 import { registerPcpBuilderTools } from '../agents/pcp-builder/index.js';
 import { registerSuccessTrackerTools } from '../agents/success-tracker/index.js';
 import { registerPortfolioMapperTools } from '../agents/portfolio-mapper/index.js';
+import { registerOrchestratorTools } from '../agents/orchestrator/index.js';
 
-const VERSION = '0.8.0';
+const VERSION = '0.9.0';
 
 export function createMcpServer(deps: ServerDeps): McpServer {
   const server = new McpServer({
@@ -44,6 +45,9 @@ export function createMcpServer(deps: ServerDeps): McpServer {
 
   // Portfolio Mapper (4 tools)
   registerPortfolioMapperTools(server, deps);
+
+  // Orchestrator (2 tools — full analysis + quick health)
+  registerOrchestratorTools(server, deps);
 
   return server;
 }
