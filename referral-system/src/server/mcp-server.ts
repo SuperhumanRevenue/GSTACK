@@ -6,8 +6,9 @@ import { registerAskTools } from '../agents/ask-architect/index.js';
 import { registerProgramManagerTools } from '../agents/program-manager/index.js';
 import { registerIncentiveTools } from '../agents/incentive-designer/index.js';
 import { registerSignalGuideTools } from '../agents/signal-guide/index.js';
+import { registerPcpBuilderTools } from '../agents/pcp-builder/index.js';
 
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 
 export function createMcpServer(deps: ServerDeps): McpServer {
   const server = new McpServer({
@@ -32,6 +33,9 @@ export function createMcpServer(deps: ServerDeps): McpServer {
 
   // Signal Guide Engine (4 tools)
   registerSignalGuideTools(server, deps);
+
+  // PCP Builder (4 tools)
+  registerPcpBuilderTools(server, deps);
 
   return server;
 }

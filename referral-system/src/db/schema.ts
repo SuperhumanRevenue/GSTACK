@@ -518,6 +518,124 @@ export const customSignalGuides = pgTable(
   ]
 );
 
+// ─── PCP (Perfect Customer Profile) Enums ───
+
+export const pcpTierEnum = pgEnum('pcp_tier', [
+  'power_law',    // Top 3% — drives ~35% of revenue
+  'high_value',   // Next 7% — strong contributors
+  'core',         // Middle 40% — steady base
+  'long_tail',    // Bottom 50% — low revenue per account
+]);
+
+export const pcpAnalysisStatusEnum = pgEnum('pcp_analysis_status', [
+  'pending',
+  'analyzing',
+  'complete',
+  'stale',
+]);
+
+// ─── PCP Tables ───
+
+/** Revenue snapshot per account — input for power-law analysis */
+export const revenueSnapshots = pgTable(
+  'revenue_snapshots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    accountId: uuid('account_id')
+      .references(() => accounts.id)
+      .notNull(),
+    period: text('period').notNull(), // e.g. '2025-Q4', '2026-Q1'
+    revenue: decimal('revenue', { precision: 14, scale: 2 }).notNull(),
+    dealCount: integer('deal_count').default(1),
+    productLines: jsonb('product_lines').$type<string[]>(),
+    expansionRevenue: decimal('expansion_revenue', { precision: 14, scale: 2 }),
+    referralSourced: boolean('referral_sourced').default(false),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_revenue_snapshots_account').on(table.accountId),
+    index('idx_revenue_snapshots_period').on(table.period),
+  ]
+);
+
+/** PCP analysis run — stores power-law distribution results */
+export const pcpAnalyses = pgTable(
+  'pcp_analyses',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(), // e.g. 'Q1 2026 Analysis'
+    period: text('period').notNull(), // date range analyzed
+    totalAccounts: integer('total_accounts').notNull(),
+    totalRevenue: decimal('total_revenue', { precision: 14, scale: 2 }).notNull(),
+    // Power-law distribution
+    powerLawThresholdPct: decimal('power_law_threshold_pct', { precision: 5, scale: 2 }).default('3'),
+    powerLawAccountCount: integer('power_law_account_count').notNull(),
+    powerLawRevenuePct: decimal('power_law_revenue_pct', { precision: 5, scale: 2 }).notNull(),
+    highValueAccountCount: integer('high_value_account_count').notNull(),
+    highValueRevenuePct: decimal('high_value_revenue_pct', { precision: 5, scale: 2 }).notNull(),
+    coreAccountCount: integer('core_account_count').notNull(),
+    coreRevenuePct: decimal('core_revenue_pct', { precision: 5, scale: 2 }).notNull(),
+    longTailAccountCount: integer('long_tail_account_count').notNull(),
+    longTailRevenuePct: decimal('long_tail_revenue_pct', { precision: 5, scale: 2 }).notNull(),
+    // Gini coefficient for concentration measurement
+    giniCoefficient: decimal('gini_coefficient', { precision: 5, scale: 4 }),
+    status: pcpAnalysisStatusEnum('status').default('pending'),
+    analyzedAt: timestamp('analyzed_at').defaultNow(),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_pcp_analyses_status').on(table.status),
+  ]
+);
+
+/** Account tier assignment from a PCP analysis */
+export const pcpAccountTiers = pgTable(
+  'pcp_account_tiers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    analysisId: uuid('analysis_id')
+      .references(() => pcpAnalyses.id)
+      .notNull(),
+    accountId: uuid('account_id')
+      .references(() => accounts.id)
+      .notNull(),
+    tier: pcpTierEnum('tier').notNull(),
+    totalRevenue: decimal('total_revenue', { precision: 14, scale: 2 }).notNull(),
+    revenuePctOfTotal: decimal('revenue_pct_of_total', { precision: 5, scale: 2 }).notNull(),
+    revenueRank: integer('revenue_rank').notNull(),
+    assignedAt: timestamp('assigned_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_pcp_account_tiers_analysis').on(table.analysisId),
+    index('idx_pcp_account_tiers_tier').on(table.tier),
+    index('idx_pcp_account_tiers_account').on(table.accountId),
+  ]
+);
+
+/** Empirical ICP weights derived from power-law account attributes */
+export const pcpIcpWeights = pgTable(
+  'pcp_icp_weights',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    analysisId: uuid('analysis_id')
+      .references(() => pcpAnalyses.id)
+      .notNull(),
+    attribute: text('attribute').notNull(), // e.g. 'industry', 'employee_count_range', 'tech_stack'
+    attributeValue: text('attribute_value').notNull(), // e.g. 'SaaS', '500-2000', 'Salesforce'
+    powerLawFrequency: decimal('power_law_frequency', { precision: 5, scale: 4 }).notNull(), // % of power-law accounts with this attribute
+    overallFrequency: decimal('overall_frequency', { precision: 5, scale: 4 }).notNull(), // % of all accounts with this attribute
+    liftScore: decimal('lift_score', { precision: 7, scale: 4 }).notNull(), // power_law_freq / overall_freq
+    weight: decimal('weight', { precision: 5, scale: 4 }).notNull(), // normalized 0-1 weight for ICP scoring
+    sampleSize: integer('sample_size').notNull(), // number of power-law accounts with this attribute
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_pcp_icp_weights_analysis').on(table.analysisId),
+    index('idx_pcp_icp_weights_attribute').on(table.attribute),
+    index('idx_pcp_icp_weights_lift').on(table.liftScore),
+  ]
+);
+
 // ─── Type Exports ───
 
 export type Account = typeof accounts.$inferSelect;
@@ -544,3 +662,11 @@ export type CustomerContext = typeof customerContexts.$inferSelect;
 export type NewCustomerContext = typeof customerContexts.$inferInsert;
 export type CustomSignalGuide = typeof customSignalGuides.$inferSelect;
 export type NewCustomSignalGuide = typeof customSignalGuides.$inferInsert;
+export type RevenueSnapshot = typeof revenueSnapshots.$inferSelect;
+export type NewRevenueSnapshot = typeof revenueSnapshots.$inferInsert;
+export type PcpAnalysis = typeof pcpAnalyses.$inferSelect;
+export type NewPcpAnalysis = typeof pcpAnalyses.$inferInsert;
+export type PcpAccountTier = typeof pcpAccountTiers.$inferSelect;
+export type NewPcpAccountTier = typeof pcpAccountTiers.$inferInsert;
+export type PcpIcpWeight = typeof pcpIcpWeights.$inferSelect;
+export type NewPcpIcpWeight = typeof pcpIcpWeights.$inferInsert;
