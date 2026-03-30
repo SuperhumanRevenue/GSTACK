@@ -636,6 +636,92 @@ export const pcpIcpWeights = pgTable(
   ]
 );
 
+// ─── Portfolio Mapper Enums ───
+
+export const entityRelationTypeEnum = pgEnum('entity_relation_type', [
+  'parent_subsidiary',
+  'pe_portfolio',
+  'vc_portfolio',
+  'holding_company',
+  'joint_venture',
+  'strategic_partner',
+]);
+
+// ─── Portfolio Mapper Tables ───
+
+/** Corporate entities (companies, investors, holding companies) */
+export const corporateEntities = pgTable(
+  'corporate_entities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    name: text('name').notNull(),
+    entityType: text('entity_type').notNull(), // 'company' | 'investor' | 'holding_company'
+    industry: text('industry'),
+    website: text('website'),
+    employeeCount: integer('employee_count'),
+    linkedAccountId: uuid('linked_account_id').references(() => accounts.id),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_corporate_entities_name').on(table.name),
+    index('idx_corporate_entities_type').on(table.entityType),
+    index('idx_corporate_entities_linked_account').on(table.linkedAccountId),
+  ]
+);
+
+/** Relationships between corporate entities */
+export const entityRelationships = pgTable(
+  'entity_relationships',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    parentEntityId: uuid('parent_entity_id')
+      .references(() => corporateEntities.id)
+      .notNull(),
+    childEntityId: uuid('child_entity_id')
+      .references(() => corporateEntities.id)
+      .notNull(),
+    relationType: entityRelationTypeEnum('relation_type').notNull(),
+    confidence: decimal('confidence', { precision: 3, scale: 2 }).notNull(), // 0.00-1.00
+    source: text('source').notNull(), // 'apollo' | 'web_search' | 'manual' | 'crm'
+    verifiedAt: timestamp('verified_at'),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_entity_relationships_parent').on(table.parentEntityId),
+    index('idx_entity_relationships_child').on(table.childEntityId),
+    index('idx_entity_relationships_type').on(table.relationType),
+  ]
+);
+
+/** Discovered second-order referral opportunities */
+export const portfolioOpportunities = pgTable(
+  'portfolio_opportunities',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    sourceAccountId: uuid('source_account_id')
+      .references(() => accounts.id)
+      .notNull(),
+    targetCompany: text('target_company').notNull(),
+    intermediaryEntityId: uuid('intermediary_entity_id')
+      .references(() => corporateEntities.id),
+    connectionType: text('connection_type').notNull(), // ReferralOpportunityType
+    connectionPath: text('connection_path').notNull(),
+    confidence: decimal('confidence', { precision: 3, scale: 2 }).notNull(),
+    estimatedAcv: decimal('estimated_acv', { precision: 12, scale: 2 }),
+    rationale: text('rationale').notNull(),
+    suggestedApproach: text('suggested_approach').notNull(),
+    status: text('status').default('identified'), // identified | pursuing | converted | dismissed
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+  },
+  (table) => [
+    index('idx_portfolio_opps_source').on(table.sourceAccountId),
+    index('idx_portfolio_opps_status').on(table.status),
+    index('idx_portfolio_opps_confidence').on(table.confidence),
+  ]
+);
+
 // ─── Type Exports ───
 
 export type Account = typeof accounts.$inferSelect;
@@ -670,3 +756,9 @@ export type PcpAccountTier = typeof pcpAccountTiers.$inferSelect;
 export type NewPcpAccountTier = typeof pcpAccountTiers.$inferInsert;
 export type PcpIcpWeight = typeof pcpIcpWeights.$inferSelect;
 export type NewPcpIcpWeight = typeof pcpIcpWeights.$inferInsert;
+export type CorporateEntity = typeof corporateEntities.$inferSelect;
+export type NewCorporateEntity = typeof corporateEntities.$inferInsert;
+export type EntityRelationshipRow = typeof entityRelationships.$inferSelect;
+export type NewEntityRelationshipRow = typeof entityRelationships.$inferInsert;
+export type PortfolioOpportunity = typeof portfolioOpportunities.$inferSelect;
+export type NewPortfolioOpportunity = typeof portfolioOpportunities.$inferInsert;

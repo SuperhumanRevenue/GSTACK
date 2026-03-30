@@ -8,8 +8,9 @@ import { registerIncentiveTools } from '../agents/incentive-designer/index.js';
 import { registerSignalGuideTools } from '../agents/signal-guide/index.js';
 import { registerPcpBuilderTools } from '../agents/pcp-builder/index.js';
 import { registerSuccessTrackerTools } from '../agents/success-tracker/index.js';
+import { registerPortfolioMapperTools } from '../agents/portfolio-mapper/index.js';
 
-const VERSION = '0.7.0';
+const VERSION = '0.8.0';
 
 export function createMcpServer(deps: ServerDeps): McpServer {
   const server = new McpServer({
@@ -40,6 +41,9 @@ export function createMcpServer(deps: ServerDeps): McpServer {
 
   // Success Tracker (5 tools)
   registerSuccessTrackerTools(server, deps);
+
+  // Portfolio Mapper (4 tools)
+  registerPortfolioMapperTools(server, deps);
 
   return server;
 }
