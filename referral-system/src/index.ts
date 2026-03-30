@@ -101,7 +101,7 @@ async function main() {
     config,
   };
 
-  // 7. Create MCP server with all 30 tools
+  // 7. Create MCP server with all 35 tools
   const server = createMcpServer(deps);
 
   // 8. Start transport
