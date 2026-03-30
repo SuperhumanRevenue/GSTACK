@@ -26,6 +26,20 @@ const configSchema = z.object({
   apolloApiKey: z.string().optional(),
   clearbitApiKey: z.string().optional(),
 
+  // LLM
+  llmProvider: z.enum(['anthropic', 'openai', 'gemini']).default('anthropic'),
+  anthropicApiKey: z.string().optional(),
+  openaiApiKey: z.string().optional(),
+  geminiApiKey: z.string().optional(),
+
+  // Web Search
+  exaApiKey: z.string().optional(),
+
+  // LinkedIn Enrichment (PhantomBuster)
+  phantombusterApiKey: z.string().optional(),
+  phantombusterProfileAgentId: z.string().optional(),
+  phantombusterCompanyAgentId: z.string().optional(),
+
   // Conversation Intelligence
   convoIntelProvider: z.enum(['gong', 'fathom']).default('gong'),
   gongApiKey: z.string().optional(),
@@ -72,6 +86,14 @@ export function loadConfig(): AppConfig {
     enrichmentProvider: process.env.ENRICHMENT_PROVIDER,
     apolloApiKey: process.env.APOLLO_API_KEY,
     clearbitApiKey: process.env.CLEARBIT_API_KEY,
+    llmProvider: process.env.LLM_PROVIDER,
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    openaiApiKey: process.env.OPENAI_API_KEY,
+    geminiApiKey: process.env.GEMINI_API_KEY,
+    exaApiKey: process.env.EXA_API_KEY,
+    phantombusterApiKey: process.env.PHANTOMBUSTER_API_KEY,
+    phantombusterProfileAgentId: process.env.PHANTOMBUSTER_PROFILE_AGENT_ID,
+    phantombusterCompanyAgentId: process.env.PHANTOMBUSTER_COMPANY_AGENT_ID,
     convoIntelProvider: process.env.CONVO_INTEL_PROVIDER,
     gongApiKey: process.env.GONG_API_KEY,
     slackBotToken: process.env.SLACK_BOT_TOKEN,

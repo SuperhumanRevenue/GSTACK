@@ -17,11 +17,18 @@ import { NotificationStub } from './integrations/notifications/stub.js';
 import { SlackAdapter } from './integrations/notifications/slack.js';
 import { IntentStub } from './integrations/intent/stub.js';
 import { LLMStub } from './integrations/llm/stub.js';
+import { AnthropicAdapter } from './integrations/llm/anthropic.js';
+import { OpenAIAdapter } from './integrations/llm/openai.js';
+import { GeminiAdapter } from './integrations/llm/gemini.js';
 import { WebSearchStub } from './integrations/web-search/stub.js';
+import { ExaAdapter } from './integrations/web-search/exa.js';
+import { PhantomBusterAdapter } from './integrations/linkedin/phantombuster.js';
 import { RateLimiter, DEFAULT_RATE_LIMITS } from './integrations/rate-limiter.js';
 import type { ServerDeps } from './shared/types.js';
 import type { CRMAdapter } from './integrations/crm/interface.js';
 import type { EnrichmentAdapter } from './integrations/enrichment/interface.js';
+import type { LLMAdapter } from './integrations/llm/interface.js';
+import type { WebSearchAdapter } from './integrations/web-search/interface.js';
 import type { NotificationAdapter } from './integrations/notifications/interface.js';
 
 const logger = pino({ name: 'referral-system' });
@@ -79,13 +86,44 @@ async function main() {
   // Intent: always stub for now
   const intent = new IntentStub();
 
-  // LLM: stub for now (swap for Claude/GPT/Gemini adapter)
-  const llm = new LLMStub();
-  logger.info('LLM: Stub');
+  // LLM: Anthropic / OpenAI / Gemini / Stub
+  let llm: LLMAdapter;
+  if (config.enableLLM) {
+    if (config.llmProvider === 'anthropic' && config.anthropicApiKey) {
+      llm = new AnthropicAdapter(config.anthropicApiKey);
+      logger.info('LLM: Anthropic Claude (live)');
+    } else if (config.llmProvider === 'openai' && config.openaiApiKey) {
+      llm = new OpenAIAdapter(config.openaiApiKey);
+      logger.info('LLM: OpenAI GPT (live)');
+    } else if (config.llmProvider === 'gemini' && config.geminiApiKey) {
+      llm = new GeminiAdapter(config.geminiApiKey);
+      logger.info('LLM: Google Gemini (live)');
+    } else {
+      llm = new LLMStub();
+      logger.warn('LLM: enabled but no API key found — using stub');
+    }
+  } else {
+    llm = new LLMStub();
+    logger.info('LLM: Stub');
+  }
 
-  // Web Search: stub for now (swap for Tavily adapter)
-  const webSearch = new WebSearchStub();
-  logger.info('Web Search: Stub');
+  // Web Search: Exa / Stub
+  let webSearch: WebSearchAdapter;
+  if (config.enableWebSearch && config.exaApiKey) {
+    webSearch = new ExaAdapter(config.exaApiKey);
+    logger.info('Web Search: Exa (live)');
+  } else {
+    webSearch = new WebSearchStub();
+    logger.info('Web Search: Stub');
+  }
+
+  // LinkedIn Enrichment: PhantomBuster (optional overlay on enrichment)
+  if (config.phantombusterApiKey && config.phantombusterProfileAgentId) {
+    logger.info('LinkedIn: PhantomBuster (available for LinkedIn profile scraping)');
+    // PhantomBuster is available as an enrichment adapter for LinkedIn-specific operations.
+    // It can be used alongside Apollo — Apollo for general enrichment, PhantomBuster for
+    // deep LinkedIn profile data when a linkedinUrl is available.
+  }
 
   // 6. Assemble dependency container
   const deps: ServerDeps = {
