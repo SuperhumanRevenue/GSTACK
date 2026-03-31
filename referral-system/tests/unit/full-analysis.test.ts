@@ -54,6 +54,7 @@ function buildMockDeps(overrides?: {
     intent: {} as unknown as ServerDeps['intent'],
     llm: {
       generate: vi.fn().mockResolvedValue('Test LLM response'),
+      generateContent: vi.fn().mockResolvedValue('Test LLM response'),
       generateStructured: vi.fn().mockResolvedValue({}),
     } as unknown as ServerDeps['llm'],
     webSearch: {
@@ -144,7 +145,7 @@ describe('Full Analysis Orchestrator', () => {
     );
 
     expect(result.accountName).toBe('Acme Corp');
-    expect(result.phases).toHaveLength(4);
+    expect(result.phases).toHaveLength(5);
     expect(result.phases.every((p) => p.status === 'completed' || p.status === 'skipped')).toBe(true);
     expect(result.intelligence.topChampions).toHaveLength(1);
     expect(result.intelligence.topChampions[0].name).toBe('Jane Smith');
@@ -310,5 +311,44 @@ describe('Full Analysis Orchestrator', () => {
     expect(result.intelligence).toHaveProperty('pipelineHealth');
     expect(result.intelligence).toHaveProperty('cohortComparison');
     expect(result.intelligence).toHaveProperty('recommendedActions');
+    expect(result.intelligence).toHaveProperty('executiveSummary');
+  });
+
+  it('generates executive summary via LLM when available', async () => {
+    const deps = buildMockDeps({
+      accounts: [buildAccount()],
+      champions: [buildChampion()],
+    });
+
+    const result = await runFullAnalysis(
+      { accountId: 'aaaaaaaa-1111-2222-3333-444444444444' },
+      deps
+    );
+
+    expect(result.intelligence.executiveSummary).toBe('Test LLM response');
+    const phase5 = result.phases.find((p) => p.phase.includes('Phase 5'));
+    expect(phase5).toBeTruthy();
+    expect(phase5?.status).toBe('completed');
+    expect(phase5?.summary).toBe('LLM briefing generated');
+  });
+
+  it('sets executiveSummary to null when LLM throws', async () => {
+    const deps = buildMockDeps({
+      accounts: [buildAccount()],
+      champions: [buildChampion()],
+    });
+    // Override generateContent to throw
+    (deps.llm.generateContent as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('LLM unavailable'));
+
+    const result = await runFullAnalysis(
+      { accountId: 'aaaaaaaa-1111-2222-3333-444444444444' },
+      deps
+    );
+
+    expect(result.intelligence.executiveSummary).toBeNull();
+    const phase5 = result.phases.find((p) => p.phase.includes('Phase 5'));
+    expect(phase5).toBeTruthy();
+    expect(phase5?.status).toBe('skipped');
+    expect(phase5?.summary).toBe('LLM unavailable — skipped');
   });
 });

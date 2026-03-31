@@ -75,6 +75,7 @@ export interface FullAnalysisResult {
     portfolioOpportunities: { target: string; combinedScore: number; type: string }[];
     pipelineHealth: { total: number; healthy: number; atRisk: number; stalled: number; critical: number };
     cohortComparison: { referralWinRate: number; outboundWinRate: number; speedAdvantage: number } | null;
+    executiveSummary: string | null;
     recommendedActions: string[];
   };
 }
@@ -481,6 +482,41 @@ export async function runFullAnalysis(
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // PHASE 5: Executive Summary (LLM-generated)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const phase5Start = Date.now();
+  let executiveSummary: string | null = null;
+
+  try {
+    const briefingPrompt = `You are a B2B sales strategist. Based on this account intelligence, write a 3-paragraph executive briefing for the sales team. Be specific, actionable, and reference the data.
+
+Account: ${account.companyName} (${account.industry}, ${account.employeeCount} employees, $${account.currentAcv} ACV)
+Readiness: ${bestScore ?? 'N/A'}/100 (${bestTier ?? 'no champions scored'})
+PCP Boost: +${pcpBoost} pts
+Champions: ${championScores.map(c => `${c.name} (${c.title}, score ${c.score})`).join(', ') || 'None'}
+Pipeline: ${healthCounts.total} deals (${healthCounts.healthy} healthy, ${healthCounts.atRisk} at risk, ${healthCounts.stalled} stalled, ${healthCounts.critical} critical)
+Portfolio Opportunities: ${portfolioOpps.length}
+Warm Paths: ${topTargets.length}
+Actions: ${actions.join('; ')}
+
+Paragraph 1: What to do THIS WEEK with this account.
+Paragraph 2: The biggest risk or opportunity and why.
+Paragraph 3: 30-day outlook and what success looks like.`;
+
+    executiveSummary = await deps.llm.generateContent(briefingPrompt);
+  } catch {
+    executiveSummary = null;
+  }
+
+  phases.push({
+    phase: 'Phase 5: Executive Summary',
+    status: executiveSummary ? 'completed' : 'skipped',
+    duration_ms: Date.now() - phase5Start,
+    summary: executiveSummary ? 'LLM briefing generated' : 'LLM unavailable — skipped',
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // FINAL RESULT
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -499,6 +535,7 @@ export async function runFullAnalysis(
       topTargets: topTargets.slice(0, 5),
       portfolioOpportunities: portfolioOpps.slice(0, 5),
       pipelineHealth: healthCounts,
+      executiveSummary,
       cohortComparison,
       recommendedActions: actions,
     },

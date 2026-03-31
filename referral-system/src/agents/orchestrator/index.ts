@@ -111,6 +111,11 @@ export function registerOrchestratorTools(server: McpServer, deps: ServerDeps): 
           '',
           '── RECOMMENDED ACTIONS ──',
           ...result.intelligence.recommendedActions.map((a) => `  → ${a}`),
+          ...(result.intelligence.executiveSummary ? [
+            '',
+            '── EXECUTIVE BRIEFING ──',
+            result.intelligence.executiveSummary,
+          ] : []),
         ].join('\n');
 
         return {
