@@ -2,16 +2,19 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import pino from 'pino';
+import type { ServerDeps } from '../shared/types.js';
+import { handleWebhookEvent, type WebhookEvent } from './webhook-handler.js';
 
 const logger = pino({ name: 'http-transport' });
 
 /**
  * Start an HTTP server with streamable HTTP transport for the MCP server.
- * Includes /health endpoint for monitoring.
+ * Includes /health endpoint for monitoring and /webhook for CRM event ingestion.
  */
 export async function startHttpTransport(
   server: McpServer,
-  port: number
+  port: number,
+  deps?: ServerDeps
 ): Promise<void> {
   // Track active transports for session management
   const transports = new Map<string, StreamableHTTPServerTransport>();
@@ -28,6 +31,39 @@ export async function startHttpTransport(
         uptime: process.uptime(),
         timestamp: new Date().toISOString(),
       }));
+      return;
+    }
+
+    // Webhook endpoint — receives CRM events and routes to agents
+    if (url.pathname === '/webhook' && req.method === 'POST') {
+      if (!deps) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Webhook handler not configured' }));
+        return;
+      }
+
+      try {
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(chunk as Buffer);
+        const body = Buffer.concat(chunks).toString();
+        const event = JSON.parse(body) as WebhookEvent;
+
+        if (!event.type || !event.timestamp) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Missing required fields: type, timestamp' }));
+          return;
+        }
+
+        const result = await handleWebhookEvent(event, deps);
+        res.writeHead(result.processed ? 200 : 422, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(result));
+      } catch (err) {
+        logger.error({ err }, 'Webhook processing error');
+        if (!res.headersSent) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+        }
+      }
       return;
     }
 

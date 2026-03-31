@@ -148,7 +148,7 @@ async function main() {
     await server.connect(transport);
     logger.info('MCP server running on stdio transport');
   } else {
-    await startHttpTransport(server, config.port);
+    await startHttpTransport(server, config.port, deps);
     logger.info({ port: config.port }, 'MCP server running on streamable HTTP transport');
   }
 }
