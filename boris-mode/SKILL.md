@@ -193,6 +193,84 @@ You are a constraint discovery agent...
 
 -----
 
+## CLAUDE.md Mastery Guide
+
+### What Goes in CLAUDE.md
+
+Your CLAUDE.md is Claude's operating manual for your codebase. It compounds over time —
+every correction you make becomes a permanent rule.
+
+### Structure Template
+
+```markdown
+# Project Name
+
+## Build & Test Commands
+- Build: `npm run build`
+- Test single: `npm run test -- -t "test name"`
+- Test file: `npm run test:file -- "glob"`
+- Lint: `npm run lint:file -- "file.ts"`
+- Full check before PR: `npm run lint && npm run test`
+
+## Code Conventions
+- Always use `bun`, not `npm`
+- Prefer `type` over `interface`; never use `enum` (use string literal unions)
+- Use named exports, not default exports
+- Error handling: always use Result types, never throw
+
+## Common Mistakes (NEVER DO THESE)
+- Never use `any` type — use `unknown` and narrow
+- Never import from barrel files in the same package
+- Never commit console.log statements
+- Never use synchronous file I/O in server code
+
+## Architecture Notes
+- [Brief description of how the codebase is organized]
+- [Key patterns and why they exist]
+- [Where to find things]
+
+## Project-Specific Context
+- [Client constraints, deployment targets, etc.]
+```
+
+### The Compounding Loop
+
+1. Claude makes a mistake in your code
+1. You correct it in code review or conversation
+1. You say: "Update CLAUDE.md so you don't make that mistake again"
+1. Claude writes a specific, actionable rule
+1. Future Claude sessions read this rule and avoid the mistake
+
+### @.claude in Code Reviews
+
+On GitHub PRs using the Claude Code GitHub Action:
+
+```
+nit: use a string literal, not ts enum
+@claude add to CLAUDE.md to never use enums, always prefer literal unions
+```
+
+Claude automatically commits the CLAUDE.md update as part of the PR.
+
+### Memory System (Auto-Dream)
+
+Claude Code now has auto-memory — it automatically saves preferences, corrections,
+and patterns between sessions. Run `/memory` to configure. Run `/dream` to trigger
+memory consolidation (cleans up outdated/redundant entries).
+
+For manual control, you can also maintain a `/memory` notes directory per task/project
+and point CLAUDE.md at it.
+
+### Maintenance Rules
+
+- **Edit ruthlessly** — stale rules create noise
+- **Be specific** — "don't use enums" beats "follow best practices"
+- **Include the WHY** — "never use barrel imports (causes circular dependency in our bundler)"
+- **Review monthly** — remove anything Claude has fully internalized
+- **Scope appropriately** — team rules in project CLAUDE.md, personal prefs in `~/.claude/CLAUDE.md`
+
+-----
+
 ## The Boris Decision Framework
 
 When facing any building task, ask:
