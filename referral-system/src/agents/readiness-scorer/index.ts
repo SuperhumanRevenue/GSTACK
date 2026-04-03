@@ -35,7 +35,7 @@ export function registerReadinessTools(server: McpServer, deps: ServerDeps) {
     },
     async ({ account_id, champion_id, override_data }) => {
       // Fetch account
-      const [account] = await db
+      let [account] = await db
         .select()
         .from(accounts)
         .where(eq(accounts.id, account_id))
@@ -51,7 +51,7 @@ export function registerReadinessTools(server: McpServer, deps: ServerDeps) {
         if (!byCrmId) {
           return { content: [{ type: 'text' as const, text: `Account not found: ${account_id}` }], isError: true };
         }
-        Object.assign(account ?? {}, byCrmId);
+        account = byCrmId;
       }
 
       const acct: Account = override_data

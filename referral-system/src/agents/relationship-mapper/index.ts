@@ -3,7 +3,6 @@ import { eq } from 'drizzle-orm';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { ServerDeps } from '../../shared/types.js';
 import { analyzeNetwork } from './network-analyzer.js';
-import { matchTargets, type TargetAccount } from './target-matcher.js';
 import { accounts, champions, connectionMaps } from '../../db/schema.js';
 import { toMarkdownTable } from '../../shared/formatting.js';
 

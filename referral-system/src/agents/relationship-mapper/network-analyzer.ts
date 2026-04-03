@@ -135,16 +135,14 @@ export function analyzeNetwork(input: AnalysisInput): NetworkAnalysis {
 // ─── Helper Functions ───
 
 function matchesICP(conn: EnrichedConnection, criteria: ICPCriteria): boolean {
-  // Title-based filtering
   if (criteria.buyerTitles && criteria.buyerTitles.length > 0) {
     const titleLower = conn.title.toLowerCase();
     const anyTitleMatch = criteria.buyerTitles.some((t) =>
       titleLower.includes(t.toLowerCase())
     );
-    // Don't filter out, just note — we still want to show connections
-    // even if they're not the exact buyer title
+    if (!anyTitleMatch) return false;
   }
-  return true; // Permissive — ICP is used for scoring, not hard filtering
+  return true;
 }
 
 function isBuyerTitle(title: string, buyerTitles?: string[]): boolean {
