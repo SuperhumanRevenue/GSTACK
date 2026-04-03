@@ -43,6 +43,13 @@ const configSchema = z.object({
   // Conversation Intelligence
   convoIntelProvider: z.enum(['gong', 'fathom']).default('gong'),
   gongApiKey: z.string().optional(),
+  fathomApiKey: z.string().optional(),
+
+  // Sync — Data Sources
+  airtableApiKey: z.string().optional(),
+  googleSheetsApiKey: z.string().optional(),
+  surveySpreadsheetId: z.string().optional(),
+  referralSpreadsheetId: z.string().optional(),
 
   // Notifications
   slackBotToken: z.string().optional(),
@@ -96,6 +103,11 @@ export function loadConfig(): AppConfig {
     phantombusterCompanyAgentId: process.env.PHANTOMBUSTER_COMPANY_AGENT_ID,
     convoIntelProvider: process.env.CONVO_INTEL_PROVIDER,
     gongApiKey: process.env.GONG_API_KEY,
+    fathomApiKey: process.env.FATHOM_API_KEY,
+    airtableApiKey: process.env.AIRTABLE_API_KEY,
+    googleSheetsApiKey: process.env.GOOGLE_SHEETS_API_KEY,
+    surveySpreadsheetId: process.env.SURVEY_SPREADSHEET_ID,
+    referralSpreadsheetId: process.env.REFERRAL_SPREADSHEET_ID,
     slackBotToken: process.env.SLACK_BOT_TOKEN,
     slackReferralChannel: process.env.SLACK_REFERRAL_CHANNEL,
     slackApprovalChannel: process.env.SLACK_APPROVAL_CHANNEL,

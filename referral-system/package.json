@@ -13,6 +13,10 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed.ts",
     "db:studio": "drizzle-kit studio",
+    "sync": "tsx src/sync/run-sync.ts",
+    "sync:hubspot": "tsx src/sync/run-sync.ts hubspot",
+    "sync:fathom": "tsx src/sync/run-sync.ts fathom",
+    "sync:sheets": "tsx src/sync/run-sync.ts sheets",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
